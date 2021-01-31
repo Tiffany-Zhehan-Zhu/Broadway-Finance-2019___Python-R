@@ -26,7 +26,7 @@ setwd("C:/Users/tiffany/Documents/...")
 
 
 ## a) Problem Statement
-According to The Broadway League, Broadway has a total attendance of 14,768,254, and grosses of US$1,829,312,140 in the 2018–2019 season; furthermore, the attendance and gross has been increasing since the year of 2016. The financial statistics exhibit the stable operations and profitability of Broadway and indicate a sustainably growing market of Broadway show performances. Broadway provides public online access to its weekly gross information. This project aims to utilize the essential amount of Broadway weekly transaction data and to identify the critical factors that affect Broadway's financial performance through multivariate data analysis methods. Based on the data scraped from webpages, we conduct an exploratory analysis, Principle Analysis, Factor Analysis, and K-Means Clustering to dig into the Broadway show performances. 
+According to The Broadway League, Broadway has a total attendance of 14,768,254, and grosses of US$1,829,312,140 in the 2018–2019 season; furthermore, the attendance and gross has been increasing since the year of 2016. The financial statistics exhibit the stable operations and profitability of Broadway and indicate a sustainably growing market of Broadway show performances. Broadway provides public online access to its weekly gross information. This project aims to utilize the essential amount of Broadway weekly transaction data and to identify the critical factors that affect Broadway's financial performance through multivariate data analysis methods. Based on the data scraped from webpages, we conduct an exploratory analysis, Principle Component Analysis, Factor Analysis, and K-Means Clustering to dig into the Broadway show performances. 
 
 
 ## b) Description of the Data
@@ -217,7 +217,7 @@ Compare the cluster solutions with shows, we can found that the top ten shows th
 
 
 
-## e) Discussion
+## e) Conclusion
 In the exploratory analysis, we illustrated that the seasonal variation exists in the weekly gross of Broadway shows while the variation is not significantly high. Summer and fall are the busiest and most fruitful seasons. Since warm weather would encourage people to travel and hang out more often than the cold seasons, weather can be an important reason why a significant portion of gross was created in the summer and fall. The exploratory analysis also shows that many of the Broadway shows, which contribute most to the gross, are those performed regularly and frequently. In the exploratory analysis, we identified the weather factor and performance count are essential factors to gross. 
 
  In the multivariate analysis, we noticed the positive correlation between gross and ticket price and between capacity and gross via PCA analysis. Price and capacity positively affect gross on both dimensions of the first two principal components. The results suggest that Broadway should carefully price their tickets and arrange the seats in the theaters if they want to improve the gross. A good pricing strategy and appropriate seating arrangement would boost sales better than just a high frequency of performances. 
