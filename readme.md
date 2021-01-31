@@ -10,7 +10,7 @@ Since Broadway provides public online access to its weekly gross information, th
 
 I scrapped information about Broadway shows from the web pages of www.playbill.com, a monthly U.S. magazine for theatergoers, through web scraping techniques with Python. The consequential broadway2019.csv dataset includes the financial information of any Broadway show that was on show in the year 2019.
 
-The broadway2019.csv dataset contains 17 variables and 1,705 observations. It provides the grosses information of 82 shows run over 52 weeks as a total of 12,424 performances in the year 2019. The definition of each variable is listed below:
+The `broadway2019.csv` dataset contains 17 variables and 1,705 observations. It provides the grosses information of 82 shows run over 52 weeks as a total of 12,424 performances in the year 2019. The definition of each variable is listed below:
 
 *   ID (Identification number of each observation)
 *   Show Name
