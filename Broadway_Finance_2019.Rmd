@@ -1,0 +1,422 @@
+---
+title: "How does Broadway show performance affect its financial performance"
+author: "Tiffany Zhu"
+output:
+  pdf_document: default
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup,  include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(psych) # describe()
+library(wordcloud) # word clouds
+library(FactoMineR) 
+library(factoextra) 
+require(RColorBrewer)
+library(rvest)
+library(dplyr)
+library(tidyr)
+library(plyr)
+
+# Python
+library(reticulate)
+use_python("/usr/local/bin/python")
+knitr::knit_engines$set(python = reticulate::eng_python)
+
+setwd("C:/Users/tiffany/Documents/2- PhD/5- Spring 2020/CMU 47755_Multivariate Data Analysis/4- Final Project")
+```
+
+
+## a) Problem Statement
+According to The Broadway League, Broadway has a total attendance of 14,768,254, and grosses of US$1,829,312,140 in the 2018–2019 season; furthermore, the attendance and gross has been increasing since the year of 2016. The financial statistics exhibit the stable operations and profitability of Broadway and indicate a sustainably growing market of Broadway show performances. Broadway provides public online access to its weekly gross information. This project aims to utilize the essential amount of Broadway weekly transaction data and to identify the critical factors that affect Broadway's financial performance through multivariate data analysis methods. Based on the data scraped from webpages, we conduct an exploratory analysis, Principle Component Analysis, Factor Analysis, and K-Means Clustering to dig into the Broadway show performances. 
+
+
+## b) Description of the Data
+
+I scrapped information on Broadway shows from the web pages of [www.playbill.com](www.playbill.com), a monthly U.S. magazine for theatergoers, through web scraping techniques in Python. The Python script for retrieving and processing the information of Broadway shows is attached at the end of this report. The consequential `broadway2019.csv` dataset includes the financial information of any Broadway show that was on show in the year 2019. 
+
+The `broadway2019.csv` dataset contains 17 variables and 1,705 observations. It provides the grosses information of 82 shows run over 52 weeks as a total of 12,424 performances in the year 2019. The definition of each variable is listed below:
+
+*   ID (Identification number of each observation)
+*   Show Name
+*   Week (The date each grosses week ending on)
+*   Theatre (The theater where a show was on show)
+*   Gross ($)
+*   Gross Difference (From week prior)
+*   Gross Potential (%)
+*   Average Ticket Price
+*   Top Ticket Price
+*   Seats Sold
+*   Seats in the Theatre 
+*   Number of Performances
+*   Number of Previews
+*   Capacity (%)
+*   Capacity Difference (From week prior)
+*   Month
+*   Season
+
+
+
+```{r, warning=FALSE}
+# Import and preview the dataset 
+broadway2019 = read.csv("broadway2019.csv")
+
+# Number of observations and number of variables
+dim(broadway2019)
+
+# Count of Shows, Weeks, and Performances
+intro = c(length(unique(broadway2019$Show.Name)), length(unique(broadway2019$Week)), sum(broadway2019$Performances))
+names(intro) = c("Count of Shows", "Count of Weeks", "Count of Performances")
+intro
+
+head(broadway2019)
+```
+
+```{r, include=FALSE}
+broadway2019$Week = as.character(broadway2019$Week)
+broadway2019$Show.Name = as.character(broadway2019$Show.Name)
+broadway2019$Theatre = as.character(broadway2019$Theatre)
+broadway2019$Seats.Sold = as.numeric(broadway2019$Seats.Sold)
+broadway2019$Seats.in.the.Theatre = as.numeric(broadway2019$Seats.in.the.Theatre)
+broadway2019$Performances = as.numeric(broadway2019$Performances)
+broadway2019$Previews = as.numeric(broadway2019$Previews)
+broadway2019$Month = as.numeric(broadway2019$Month)
+broadway2019$Season = as.character(broadway2019$Season)
+broadway2019[is.na(broadway2019)] = 0 # Replace NA with 0
+```
+
+
+## c) Exploratory Analysis of the Data
+```{r, warning=FALSE}
+# Performances Count of Each Season
+showFreq = aggregate(Performances ~ Show.Name + Season, data = broadway2019, sum) 
+showFreq = spread(showFreq, Season, Performances)
+showFreq[is.na(showFreq)] = 0 # Replace NA with 0
+(season = colSums(showFreq[, c("Spring", "Summer", "Fall", "Winter", "Holiday")]))
+
+# Gross of Each Season
+showGrossSe = aggregate(Gross ~ Show.Name + Season, data = broadway2019, sum) 
+boxplot(Gross ~ Season, data=showGrossSe, col=c("red","blue","orange","green","yellow"), main="Seasonal variability in Total Gross")
+showGrossSe = spread(showGrossSe, Season, Gross)
+showGrossSe[is.na(showGrossSe)] = 0 # Replace NA with 0
+(GrossSe = colSums(showGrossSe[, c("Spring", "Summer", "Fall", "Winter", "Holiday")]))
+
+# Which shows were most busy throughout the year of 2019 on Broadway
+showFreqWK = aggregate(Performances ~ Show.Name + Week, data = broadway2019, sum) 
+showFreqWK = na.omit(spread(showFreqWK, Week, Performances))
+showFreqWK$Show.Name
+
+# Which shows have the most of grosses in the year of 2019
+showGross = aggregate(Gross ~ Show.Name, data = broadway2019, sum) 
+topGross = top_n(showGross, 10, Gross)
+(topGross[order(-topGross$Gross),])
+```
+
+The exploratory analysis results clearly show that summer and fall are busy seasons for Broadway, as in these two seasons, Broadway has most of their performances on the show and make more money than in other seasons. The boxplot show that the gross range in summer and fall are bigger than the other seasons, but the median gross does not vary alot among the five seasons. And there are very few outliers in the five seasons, thus the weekly gross is usually in a predictable range.
+
+The gross data have revealed that among the eighty-two shows, the `Hamilton`, `The Lion King`, and `To Kill A Mockingbird` are the top three shows that have contributed most to the annual gross of Broadway in 2019. The top seven shows that have made the most profits are in on show every week throughout the year 2019.  Meanwhile, another seven shows were also on the show on Broadway on a weekly basis throughout the year 2019.
+
+
+### Wordcloud
+```{r, warning=FALSE}
+for (i in unique(broadway2019$Season)){
+  shows_season = subset(broadway2019, Season == i)  # select all the shows in this season
+  shows_scount = as.data.frame(aggregate(Performances ~ Show.Name + Season, data = shows_season, sum))
+  names(shows_scount) = c("Show_Name", "Season", "Count")
+  
+  layout(matrix(c(1, 2), nrow = 2), heights = c(1, 5))
+  par(mar = rep(0, 4))
+  plot.new()
+  text(x = 0.5, y = 0.5, label = paste("Word Cloud:", i), cex=1.5)
+  wordcloud(shows_scount$Show_Name, shows_scount$Count, colors=brewer.pal(8,"Spectral"))
+}
+```
+
+The word clouds by season visualize the popular shows of each season. We can see that shows such as `Hamilton`, `Aladdin`, and `Frozen` are popular throughout the year and regardless of seasons. Those shows are also the busiest shows and most profitable shows of 2019.
+
+
+## d) Multivariate Analysis of the Data
+```{r, warning=FALSE}
+x = as.matrix(broadway2019[,c(5:15)], rownames=broadway2019$ID)
+sx = scale(x) # standardizethe data
+describe(sx) # Check if mean=0 and sd=1
+sx.cor = t(sx) %*% sx /(nrow(sx)-1)
+all.equal(sx.cor, cor(x)) # Compare sx.cor with cor(x)
+```
+
+
+### Principal Component Analysis
+```{r}
+res.pca <- PCA(x, graph = FALSE)
+fviz_screeplot(res.pca, addlabels=TRUE)
+fviz_pca_var(res.pca)
+fviz_pca_biplot(res.pca, repel = TRUE)
+```
+
+The screen plot represents that the first four components explain more than 85% of the variation of the dataset. 
+
+The variable PCA plot is a plot of variable correlation and shows the relationships between all variables. Positively correlated variables are grouped together, while negatively correlated variables are positioned on opposite sides of the plot origin (opposed quadrants). The distance between variables and the origin measures the quality of the variables on the factor map. Variables that are away from the origin are well represented on the factor map. The plot shows that previews are negatively correlated with all the other variables. Seats, number of performances, and gross are positively correlated with each other. The average ticket price and top ticket price are more positively correlated with gross than the number of performances.
+
+
+
+### Factor Analysis
+```{r}
+scree(sx.cor)
+(partB.fac.ml = fa(sx, nfactors=4, rotate="varimax", fm="ml", scores=TRUE))
+```
+
+According to the scree plot, the first four factors account for most of the total variability in data. The remaining factors account for a very small proportion of the variability and are unlikely to be important. Therefore, I used four factors in the factor analysis. The factor analysis results show that the gross, potential gross, and ticket prices are loaded heavily on the fourth factor, while seats load heavily on the first factor, and the number of performances loads heavily on the second factor. So the first factor should be a factor related to the number of seats, the second factor is a performance factor, the third factor is capacity, and the fourth factor is a related price factor. The results also attach the importance of seat arrangement and ticket pricing on the improvement of gross. 
+
+
+
+### K-means Clustering
+```{r, warning=FALSE}
+# compute multiple cluster solutions
+kclust=c(2:20,30,40,50) # create a vector of k values to try
+nclust=length(kclust) # number of kmeans solutions to compute
+bss=wss=rep(0,nclust) # initialize vectors bss and wss to zeroes
+set.seed(34612) # set the seed so we can repeat the results
+grpQ=as.list(rep(NULL,nclust)) # create empty list to save results
+
+# compute SS for each cluster
+for (i in 1:nclust) {
+grpQ[[i]]=kmeans(x,kclust[i],nstart=1) # compute kmeans solution
+wss[i]=grpQ[[i]]$tot.withinss # save the within SS
+bss[i]=grpQ[[i]]$betweenss # save the between SS
+}
+
+# plot the results and look for the "Hockey-Stick" effect
+par(mfrow=c(1,1))
+plot(kclust,wss,type="l",main="Within SS for k-means") # Within SS is variation of errors
+points(kclust,wss)
+plot(kclust,bss/(wss+bss),type="l",main="R-Squared for k-means") # R-Squared is ratio of explained variation
+points(kclust,bss/(wss+bss))
+
+# compute a k=18 solution
+set.seed(569123)   # initialize the random number generator so we all get the same results
+grpB=kmeans(x, centers=14, nstart=20)
+
+# summarize the centroids
+grpBcenter=t(grpB$centers)
+
+# compare the cluster solutions with shows
+table(broadway2019$Show.Name, grpB$cluster)
+topGross$Show.Name
+
+# Compare the top 10 gross shows
+top10data = subset(broadway2019, Show.Name %in% topGross$Show.Name)
+join(join(join(join(aggregate(Avg.Ticket.Price ~ Show.Name, top10data, median), 
+     aggregate(Top.Ticket.Price ~ Show.Name, top10data, median)),
+     aggregate(Performances ~ Show.Name, top10data, sum)),
+      aggregate(Capacity ~ Show.Name, top10data, sum)),
+       aggregate(Seats.in.the.Theatre ~ Show.Name, top10data, mean))
+```
+
+In the plot of Within SS for k−means, the within-cluster sum of squares jumps up when the k increases from 14 to 15, indicating that the variability of the observations within each cluster increases a lot between k value of 14 and 15. Thus, 14 will be a good value of k. Furthermore, in the plot of R−Squared for k−means, the R-Squared jumps down when the k increases from 14 to 15, indicating that explained variation of the model decreases a lot between k value of 14 and 15, which also means that 14 will be a good value of k.
+
+Compare the cluster solutions with shows, we can found that the top ten shows that have earned most of the gross in 2019 concentrate in the cluster 1, 3, 4, and 6. These shows have more common characters than the other performances, for example, the median average ticket prices, numbers of performances, capacity of the top ten shows are very close to each other, the median top ticket prices and mean number of seats in the theater vary a little bit more than other attributes 
+
+
+
+
+## e) Conclusion
+In the exploratory analysis, we illustrated that the seasonal variation exists in the weekly gross of Broadway shows while the variation is not significantly high. Summer and fall are the busiest and most fruitful seasons. Since warm weather would encourage people to travel and hang out more often than the cold seasons, weather can be an important reason why a significant portion of gross was created in the summer and fall. The exploratory analysis also shows that many of the Broadway shows, which contribute most to the gross, are those performed regularly and frequently. In the exploratory analysis, we identified the weather factor and performance count are essential factors to gross. 
+
+ In the multivariate analysis, we noticed the positive correlation between gross and ticket price and between capacity and gross via PCA analysis. Price and capacity positively affect gross on both dimensions of the first two principal components. The results suggest that Broadway should carefully price their tickets and arrange the seats in the theaters if they want to improve the gross. A good pricing strategy and appropriate seating arrangement would boost sales better than just a high frequency of performances. 
+
+In the factor analysis, we identified four essential factors. The first factor should be related to the number of seats, the second factor is a performance factor, the third factor is capacity, and the fourth factor is a related price factor. The results also attach the importance of seat arrangement and ticket pricing to the improvement of gross and support the previous results we found.
+
+In the clustering analysis, we found that the shows contribute most to the gross have more common characters than the other performances. They are very similar to each other regarding the median average ticket prices, numbers of performances, and the capacity; nevertheless, these shows are a little bit dissimilar to each other on the median top ticket prices and mean the number of seats in the theater.  Overall, the results reveal that the seat arrangement and ticket pricing are of great importance to gross improvement. 
+
+
+\newpage
+## Appendix
+### Python Script for Web Scraping Broardway Shows
+```{python, eval=FALSE}
+import os
+import requests
+import urllib
+import math
+import copy
+import pandas as pd	
+import numpy as np
+import datetime
+from bs4 import BeautifulSoup 
+
+
+#####################################################################
+###################### Prepare Functions ############################
+#####################################################################
+
+class html_tables(object):
+    
+    def __init__(self, url):
+        
+        self.url      = url
+        self.r        = requests.get(self.url)
+        self.url_soup = BeautifulSoup(self.r.text)
+        
+    def read(self):
+        
+        self.tables      = []
+        self.tables_html = self.url_soup.find_all("table")
+        
+        # Parse each table
+        for n in range(0, len(self.tables_html)):
+            
+            n_cols = 0
+            n_rows = 0
+            
+            for row in self.tables_html[n].find_all("tr"):
+                col_tags = row.find_all(["td", "th"])
+                if len(col_tags) > 0:
+                    n_rows += 1
+                    if len(col_tags) > n_cols:
+                        n_cols = len(col_tags)
+            
+            # Create dataframe
+            df = pd.DataFrame(index = range(0, n_rows), columns = range(0, n_cols))
+            
+            # Create list to store rowspan values 
+            skip_index = [0 for i in range(0, n_cols)]
+            
+            # Start by iterating over each row in this table...
+            row_counter = 0
+            for row in self.tables_html[n].find_all("tr"):
+                
+                # Skip row if it's blank
+                if len(row.find_all(["td", "th"])) == 0:
+                    next
+                
+                else:
+                    
+                    # Get all cells containing data in this row
+                    columns = row.find_all(["td", "th"])
+                    col_dim = []
+                    row_dim = []
+                    col_dim_counter = -1
+                    row_dim_counter = -1
+                    col_counter = -1
+                    this_skip_index = copy.deepcopy(skip_index)
+                    
+                    for col in columns:
+                        
+                        # Determine cell dimensions
+                        colspan = col.get("colspan")
+                        if colspan is None:
+                            col_dim.append(1)
+                        else:
+                            col_dim.append(int(colspan))
+                        col_dim_counter += 1
+                            
+                        rowspan = col.get("rowspan")
+                        if rowspan is None:
+                            row_dim.append(1)
+                        else:
+                            row_dim.append(int(rowspan))
+                        row_dim_counter += 1
+                            
+                        # Adjust column counter
+                        if col_counter == -1:
+                            col_counter = 0  
+                        else:
+                            col_counter = col_counter + col_dim[col_dim_counter - 1]
+                            
+                        while skip_index[col_counter] > 0:
+                            col_counter += 1
+
+                        # Get cell contents  
+                        cell_data = col.get_text()
+                        
+                        # Insert data into cell
+                        df.iat[row_counter, col_counter] = cell_data
+
+                        # Record column skipping index
+                        if row_dim[row_dim_counter] > 1:
+                            this_skip_index[col_counter] = row_dim[row_dim_counter]
+                
+                # Adjust row counter 
+                row_counter += 1
+                
+                # Adjust column skipping index
+                skip_index = [i - 1 if i > 0 else i for i in this_skip_index]
+
+            # Append dataframe to list of tables
+            self.tables.append(df)
+        
+        return(self.tables)
+
+
+
+#####################################################################
+################# Scrap Information from Webpages ###################
+#####################################################################
+
+# Select all the Sundays of 2019
+def allsundays(year):
+    return pd.date_range(start=str(year), end=str(year+1), 
+                         freq='W-SUN').strftime('%Y-%m-%d').tolist()
+sunday2019 = list(allsundays(2019))
+
+# Scrap the information of all broadway shows in 2019
+data = pd.DataFrame()
+for week in sunday2019:
+    url = "https://www.playbill.com/grosses?week="+week
+#    request = requests.get(url)
+#    if request.status_code == 200:     # Check if the url exists
+    df = html_tables(url).read()[0]
+    df['Week'] = week
+    data = data.append(df)
+
+data.to_csv("broadwaydata2019.csv", index=False)
+data.isnull().values.any() # None null 
+
+
+
+
+#####################################################################
+################ Processing Web Scraped Information #################
+#####################################################################
+
+listData = data.iloc[:, 0:len(data.columns)-1]
+
+for i in range(len(listData.columns)):
+    listData.iloc[:,i] = listData.iloc[:,i].str.split('\n')
+
+Broadway2019 = pd.concat([
+    listData.iloc[:,0].apply(pd.Series).iloc[:,[1,2]],
+    listData.iloc[:,1].apply(pd.Series).iloc[:,[1,2]],
+    listData.iloc[:,2].apply(pd.Series).iloc[:,1],
+    listData.iloc[:,3].apply(pd.Series).iloc[:,[1,2]], 
+    listData.iloc[:,4].apply(pd.Series).iloc[:,[1,2]], 
+    listData.iloc[:,5].apply(pd.Series).iloc[:,[1,2]],
+    listData.iloc[:,6].apply(pd.Series).iloc[:,1], 
+    listData.iloc[:,7].apply(pd.Series).iloc[:,1]], 
+    axis=1, ignore_index=True) 
+
+Broadway2019.columns = ["Show Name", "Theatre", "Gross", "Potential Gross", "Gross Diff", 
+                        "Avg Ticket Price", "Top Ticket Price", "Seats Sold", "Seats in the Theatre",
+                        "Performances", "Previews", "Capacity", "Capacity Diff"]
+
+Broadway2019['Week'] = data["Week"]
+Broadway2019['Month'] = pd.DatetimeIndex(Broadway2019['Week']).month 
+Broadway2019.loc[(Broadway2019['Month']==1) | (Broadway2019['Month']==2), 'Season'] = 'Winter'
+Broadway2019.loc[(Broadway2019['Month']==3) | (Broadway2019['Month']==4), 'Season'] = 'Spring'
+Broadway2019.loc[(Broadway2019['Month']==5) | (Broadway2019['Month']==6) | (Broadway2019['Month']==7), 'Season'] = 'Summer'
+Broadway2019.loc[(Broadway2019['Month']==8) | (Broadway2019['Month']==9) | (Broadway2019['Month']==10), 'Season'] = 'Fall'
+Broadway2019.loc[(Broadway2019['Month']==11) | (Broadway2019['Month']==12), 'Season'] = 'Holiday'
+
+Broadway2019.isnull().values.any() # None null 
+
+Broadway2019.to_csv("broadway2019.csv", index=False)
+```
+
+
+
+
+
+
+
