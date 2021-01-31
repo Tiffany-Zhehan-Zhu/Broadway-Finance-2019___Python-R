@@ -21,12 +21,7 @@ library(dplyr)
 library(tidyr)
 library(plyr)
 
-# Python
-library(reticulate)
-use_python("/usr/local/bin/python")
-knitr::knit_engines$set(python = reticulate::eng_python)
-
-setwd("C:/Users/tiffany/Documents/2- PhD/5- Spring 2020/CMU 47755_Multivariate Data Analysis/4- Final Project")
+setwd("C:/Users/tiffany/Documents/...")
 ```
 
 
