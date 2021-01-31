@@ -1,5 +1,4 @@
-# How does Broadwasy show peoformance affect its financial performance?
-
+# How does Broadway show performance affect its financial performance?
 
 **Problem Statement**
 
